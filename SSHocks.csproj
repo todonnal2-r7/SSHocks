@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+	<TargetFramework>net60</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Renci.SshNet.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Renci.SshNet.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Renci.SshNet">
+      <HintPath>..\SSH.NET\src\Renci.SshNet\bin\Debug\net6.0\Renci.SshNet.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
