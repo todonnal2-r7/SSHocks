@@ -1,4 +1,4 @@
-<h1>SSHocks v. 1.0.1</h1>
+<h1>SSHocks (dev)</h1>
                                        
 SSHocks was born out of a penetration testing need. On a Red Team engagement, we need to get a Socks5 proxy up and fast. We originally had one working through an SSH tunnel using OpenSSH installed on a Windows 10 target. However, partway through our engagement, the client placed protections that stopped ssh.exe from functioning. I got to work and cobbled together this simple SSH client with full Socks5 support. I wanted it to be a single executable file so it was easy to upload. It's built targeting .NET 6.0. You can retarget as needed. This project can be published via *dotnet* as a single file.
 
@@ -12,7 +12,7 @@ The latest release is confirmed to work on Windows 10 hosts. It has not yet been
 
 **NOTES:**
 
-1. You will need to create the user account on your SSH server. Then, generate a keypair on your SSH server for your victim's user account. **DO NOT SET A PASSWORD ON THE KEY.** SSHocks v1.0.1 now supports both ed_25519 and RSA keys.
+1. You will need to create the user account on your SSH server. Then, generate a keypair on your SSH server for your victim's user account. **DO NOT SET A PASSWORD ON THE KEY.** SSHocks now supports both ed_25519 and RSA keys.
 
 2. Upload the key and SSHocks.exe to the victim host using your C2 agent or whatever other means you might have for uploading sketchy stuff. **(At this time, SSHocks cannot be assembly loaded. I'm working on fixing that. Any assistance is appreciated!)**
 
