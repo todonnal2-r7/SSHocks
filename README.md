@@ -30,3 +30,5 @@ The proxy will receive the connection request and interpret it as a command to s
 
 <h2>To Do:</h2>
 - Modify source to be able to be loaded using Assembly Reflection
+- Add ability to set local proxy port as a command option
+- Add ability to provide the SSH private key as a base64 blob in the command to avoid having to upload one to disk
